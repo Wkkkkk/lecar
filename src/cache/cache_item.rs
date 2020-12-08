@@ -1,10 +1,10 @@
-use std::time::SystemTime;
+use std::time::Instant;
 
 /// Definition of a cache item
 #[derive(Eq, PartialEq, Clone, Debug)]
 pub struct CacheItem {
     frequency: usize,
-    last_used: SystemTime,
+    last_used: Instant,
     key: usize,
     value: Vec<u8>
 }
@@ -15,7 +15,7 @@ impl CacheItem {
     pub fn new(key: usize, value: Vec<u8>) -> Self {
         Self {
             frequency: 0,
-            last_used: SystemTime::now(),
+            last_used: Instant::now(),
             key,
             value
         }
@@ -25,7 +25,7 @@ impl CacheItem {
     /// Updates the last used time to now
     pub fn touch(&mut self) {
         self.frequency += 1;
-        self.last_used = SystemTime::now();
+        self.last_used = Instant::now();
     }
 
     /// Sets the cache item's value to the one given
@@ -41,7 +41,7 @@ impl CacheItem {
     }
 
     /// Getter for last_used
-    pub fn last_used(&self) -> SystemTime {
+    pub fn last_used(&self) -> Instant {
         self.last_used
     }
 

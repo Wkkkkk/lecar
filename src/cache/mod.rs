@@ -15,7 +15,8 @@ pub use self::{
 /// Or converting the item into the wrapped item
 pub trait ICacheItemWrapper: Clone + Eq + PartialEq + Ord + PartialOrd {
     fn get_inner_key(&self) -> usize;
-    fn into_inner(self) -> CacheItem;
+    fn get_duration(&self) -> f64;
+    fn into_inner(self) -> (CacheItem, f64, Policy);
 }
 
 /// Trait to enforce interface for caches

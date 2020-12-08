@@ -1,15 +1,17 @@
 use std::cmp::Ordering;
 use crate::cache::{ICacheItemWrapper, CacheItem};
+use std::time::Instant;
+use crate::enums::Policy;
 
 /// Wrapper struct for CacheItem to implement different PartialEq, PartialOrd, and Ord
 #[derive(Eq, Clone, Debug)]
-pub struct LFUCacheItem(CacheItem);
+pub struct LFUCacheItem(CacheItem, Instant);
 
 /// Implementation of the LFUCacheItem
 impl LFUCacheItem {
     /// Returns a wrapped CacheItem
     pub fn new(cache_item: CacheItem) -> Self {
-        Self(cache_item)
+        Self(cache_item, Instant::now())
     }
 }
 
@@ -40,7 +42,12 @@ impl ICacheItemWrapper for LFUCacheItem {
         self.0.key()
     }
 
-    fn into_inner(self) -> CacheItem {
-        self.0
+    fn get_duration(&self) -> f64 {
+        self.1.elapsed().as_secs_f64()
+    }
+
+    fn into_inner(self) -> (CacheItem, f64, Policy) {
+        let duration = self.get_duration();
+        (self.0, duration, Policy::LFU)
     }
 }

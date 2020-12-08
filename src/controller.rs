@@ -1,6 +1,9 @@
 use crate::cache::{Cache, CacheItem, LFUCacheItem, LRUCacheItem, ICache, IPolicy, ICacheItemWrapper};
-use std::collections::{HashMap, BinaryHeap};
 use crate::enums::Policy;
+use crate::constants::{DISCOUNT_RATE, LEARNING_RATE};
+use rand::random;
+use std::collections::{HashMap, BinaryHeap};
+use std::f64::consts::E;
 
 /// Controlling struct for the cache
 /// Keeps a main cache and several (2+) policy caches
@@ -9,7 +12,8 @@ use crate::enums::Policy;
 pub struct Controller {
     cache: Cache<HashMap<usize, CacheItem>>,
     lfu: Cache<BinaryHeap<LFUCacheItem>>,
-    lru: Cache<BinaryHeap<LRUCacheItem>>
+    lru: Cache<BinaryHeap<LRUCacheItem>>,
+    lfu_prob: f64
 }
 
 impl Controller {
@@ -18,8 +22,30 @@ impl Controller {
         Self {
             cache: Cache::new(cache_size),
             lfu: Cache::new(lfu_cache_size),
-            lru: Cache::new(lru_cache_size)
+            lru: Cache::new(lru_cache_size),
+            lfu_prob: 0.5
         }
+    }
+
+    fn get_policy(&self) -> Policy {
+        if random::<f64>() <= self.lfu_prob {
+            Policy::LFU
+        } else {
+            Policy::LRU
+        }
+    }
+
+    fn update_weights(&mut self, time_duration: f64, miss_from: Policy) {
+        let reward = DISCOUNT_RATE.powf(time_duration);
+        let mut new_lfu_prob = self.lfu_prob;
+        let mut new_lru_prob = 1.0 - self.lfu_prob;
+
+        match miss_from {
+            Policy::LFU => new_lru_prob = new_lru_prob * E.powf(LEARNING_RATE * reward),
+            Policy::LRU => new_lfu_prob = new_lfu_prob * E.powf(LEARNING_RATE * reward)
+        };
+
+        self.lfu_prob = new_lfu_prob / (new_lfu_prob + new_lru_prob);
     }
 
     /// Retrieves an item from the cache
@@ -31,14 +57,16 @@ impl Controller {
     /// Policy cache ejects an item depending on its policy if it is full in O(1) time
     /// Returns the found item or None
     pub fn get(&mut self, key: usize) -> Option<Vec<u8>> {
-        let policy = Policy::from_bool(rand::random());
-
         match self.cache.get(key) {
+            // HIT
             Some(item) => Some(item.value().clone()),
+            // MISS
             None => {
                 match self.find_key_in_policy_caches(key) {
-                    Some(ejected_item) => {
+                    Some((ejected_item, time_duration, old_policy)) => {
+                        self.update_weights(time_duration, old_policy);
                         let value_to_return = ejected_item.value().clone();
+                        let policy = self.get_policy();
                         let maybe_cache_item = self.cache.insert_with_policy(ejected_item, policy);
 
                         self.insert_into_policy_cache(
@@ -62,15 +90,16 @@ impl Controller {
     /// Otherwise it inserts the item and ejects another item via a given policy from the learner
     /// It then inserts that ejected item into a policy cache which will eject an item if full
     pub fn insert(&mut self, key: usize, value: Vec<u8>) {
-        let policy = Policy::from_bool(rand::random());
-
         // Ejected cache item from either the LFU or the LRU, if it exists in either
         match self.find_key_in_policy_caches(key) {
             // If cache item existed in policy caches
             // Update it
             // Insert into main cache given the new policy
-            Some(mut ejected_item) => {
+            Some((mut ejected_item, time_duration, old_policy)) => {
                 ejected_item.update(value);
+
+                self.update_weights(time_duration, old_policy);
+                let policy = self.get_policy();
 
                 let maybe_cache_item = self.cache.insert_with_policy(ejected_item, policy);
 
@@ -82,6 +111,7 @@ impl Controller {
             // Cache item was not found in the policy caches
             // Add it to cache
             None => {
+                let policy = self.get_policy();
                 let maybe_cache_item = self.cache.insert_with_policy(CacheItem::new(key, value), policy);
 
                 self.insert_into_policy_cache(
@@ -103,7 +133,7 @@ impl Controller {
     }
 
     /// Given a key, find an item in a policy cache if it exists on one
-    fn find_key_in_policy_caches(&mut self, key: usize) -> Option<CacheItem> {
+    fn find_key_in_policy_caches(&mut self, key: usize) -> Option<(CacheItem, f64, Policy)> {
         self.lfu
             .maybe_eject_key(key)
             .and_then(|cache_item| Some(cache_item.into_inner()))
