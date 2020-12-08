@@ -1,6 +1,7 @@
 #![feature(binary_heap_retain)]
 #![feature(associated_type_defaults)]
 #![feature(proc_macro_hygiene, decl_macro)]
+#![feature(in_band_lifetimes)]
 
 #[macro_use] extern crate rocket;
 

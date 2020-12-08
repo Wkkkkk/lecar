@@ -9,3 +9,6 @@ edition = "2018"
 [dependencies]
 rand = "0.7.3"
 rocket = "0.4.6"
+rocket_contrib = "0.4.6"
+serde = {version = "1.0.118", features = ["derive"]}
+serde_bytes = "0.11.5"

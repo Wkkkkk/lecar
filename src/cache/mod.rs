@@ -11,29 +11,36 @@ pub use self::{
     lru::LRUCacheItem
 };
 
+/// Trait which gives an interface for retrieving the wrapped item's key
+/// Or converting the item into the wrapped item
 pub trait ICacheItemWrapper: Clone + Eq + PartialEq + Ord + PartialOrd {
     fn get_inner_key(&self) -> usize;
     fn into_inner(self) -> CacheItem;
 }
 
+/// Trait to enforce interface for caches
 pub trait ICache {
     fn new(capacity: usize) -> Self;
     fn contains(&self, key: usize) -> bool;
     fn len(&self) -> usize;
 }
 
+/// Trait to give a policy to a cache
+/// Tells the cache HOW to to evict and insert items
 pub trait IPolicy<I: ICacheItemWrapper> {
     fn eject(&mut self);
     fn maybe_eject_key(&mut self, key: usize) -> Option<I>;
     fn insert(&mut self, cache_item: I);
 }
 
+/// Basic struct for caches
 #[derive(Debug)]
 pub struct Cache<C> {
     capacity: usize,
     cache: C
 }
 
+/// Implementation of ICache for a BinaryHeap (priority queue) Cache
 impl<I: ICacheItemWrapper> ICache for Cache<BinaryHeap<I>> {
     fn new(capacity: usize) -> Self {
         Self {
@@ -51,6 +58,7 @@ impl<I: ICacheItemWrapper> ICache for Cache<BinaryHeap<I>> {
     }
 }
 
+/// Implementation of ICache for a HashMap cache
 impl ICache for Cache<HashMap<usize, CacheItem>> {
     fn new(capacity: usize) -> Self {
         Self {
@@ -126,11 +134,16 @@ impl Cache<HashMap<usize, CacheItem>> {
     }
 }
 
+/// Implementation of IPolicy for BinaryHeap (priority queue) caches
+/// The ordering of the BinaryHeap depends on the generic I item
 impl<I: ICacheItemWrapper> IPolicy<I> for Cache<BinaryHeap<I>> {
+    /// Ejects the first ordered item in the BinaryHeap
     fn eject(&mut self) {
         self.cache.pop();
     }
 
+    /// Iterates over the BinaryHeap to find an item given a key
+    /// If found, ejects, reorders BinaryHeap, and returns the item
     fn maybe_eject_key(&mut self, key: usize) -> Option<I> {
         match self.cache.iter().filter(|item| item.get_inner_key() == key).next() {
             Some(t) => {
@@ -142,6 +155,8 @@ impl<I: ICacheItemWrapper> IPolicy<I> for Cache<BinaryHeap<I>> {
         }
     }
 
+    /// If the cache is full, eject an item from the cache
+    /// Then insert the given item into the cache
     fn insert(&mut self, cache_item: I) {
         if self.capacity == self.cache.len() {
             self.eject();
