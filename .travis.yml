@@ -26,6 +26,6 @@ before_deploy:
   - cp target/release/${EXE_NAME} .
   - zip -r ${ZIP_NAME} ${EXE_NAME}
 deploy:
-  skip_cleanup: true
   provider: releases
+  api_key: $GITHUB_OAUTH_TOKEN
   file: ${ZIP_NAME}
