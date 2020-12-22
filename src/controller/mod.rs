@@ -1,13 +1,16 @@
-use crate::cache::{Cache, CacheItem, LFUCacheItem, LRUCacheItem, ICache, IPolicy, ICacheItemWrapper};
-use crate::enums::Policy;
-use crate::constants::{DISCOUNT_RATE, LEARNING_RATE};
+use crate::cache::{Cache, CacheItem, LFUCacheItem, LRUCacheItem, ICache, IPolicy, ICacheItemWrapper, Policy};
+use self::constants::{DISCOUNT_RATE, LEARNING_RATE};
 use rand::random;
 use std::collections::{HashMap, BinaryHeap};
 use std::f64::consts::E;
 
+mod constants;
+
 /// Controlling struct for the cache
 /// Keeps a main cache and several (2+) policy caches
 /// Uses a learner to determine which policy cache to utilize
+/// TODO: Allow custom policy injection
+/// TODO: Allow deserialization for weights probability
 #[derive(Debug)]
 pub struct Controller {
     cache: Cache<HashMap<usize, CacheItem>>,

@@ -1,4 +1,4 @@
-use crate::controller::Controller;
+use lecar::controller::Controller;
 use rocket::State;
 use std::sync::{Arc, Mutex};
 use crate::routes::types::LecarData;

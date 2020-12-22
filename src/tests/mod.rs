@@ -1,7 +1,21 @@
 use crate::cache::{Cache, CacheItem, ICache};
 use crate::controller::Controller;
-use crate::enums::AccessMethod;
 use rand::prelude::*;
+
+/// Represents how the cache is being accessed
+pub enum AccessMethod {
+    READ,
+    WRITE
+}
+
+impl AccessMethod {
+    pub fn from_bool(x: bool) -> Self {
+        match x {
+            true => Self::READ,
+            false => Self::WRITE
+        }
+    }
+}
 
 #[test]
 fn test_controller() {

@@ -1,7 +1,6 @@
 use std::cmp::Ordering;
-use crate::cache::{ICacheItemWrapper, CacheItem};
+use crate::cache::{ICacheItemWrapper, CacheItem, Policy};
 use std::time::Instant;
-use crate::enums::Policy;
 
 /// Wrapper struct for CacheItem to implement different PartialEq, PartialOrd, and Ord
 #[derive(Eq, Clone, Debug)]

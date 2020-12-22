@@ -1,12 +1,13 @@
 use std::collections::{BinaryHeap, HashMap};
-use crate::enums::Policy;
 
 mod cache_item;
+mod enums;
 mod lfu;
 mod lru;
 
 pub use self::{
     cache_item::CacheItem,
+    enums::Policy,
     lfu::LFUCacheItem,
     lru::LRUCacheItem
 };
