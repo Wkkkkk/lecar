@@ -1,0 +1,32 @@
+language: rust
+cache: cargo
+os:
+  - linux
+  - osx
+  - windows
+branches:
+  only:
+    - master
+rust:
+  - nightly
+script:
+  - cargo build --release --features web
+before_deploy:
+  # Setup variables
+  - export TRAVIS_TAG=v${TRAVIS_BUILD_NUMBER}-${TRAVIS_OS_NAME}
+  - export EXE_NAME="lecar-web"
+  - export ZIP_NAME=${PROJECT_NAME}-${TRAVIS_TAG}.zip
+  # Set up git user name and tag this commit
+  - git config --local user.name "Paul Reesman"
+  - git config --local user.email "paul.r.reesman@gmail.com"
+  - git tag $TRAVIS_TAG
+  # Create artifact
+  - if [ "$TRAVIS_OS_NAME" = "windows" ]; then export EXE_NAME=${EXE_NAME}.exe ; fi
+  - if [ "$TRAVIS_OS_NAME" = "windows" ]; then choco install zip ; fi
+  - cp target/release/${EXE_NAME} .
+  - zip -r ${ZIP_NAME} ${EXE_NAME}
+deploy:
+  skip_cleanup: true
+  provider: releases
+  api_key: $GITHUB_OAUTH_TOKEN
+  file: ${ZIP_NAME}
