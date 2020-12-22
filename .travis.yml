@@ -14,7 +14,7 @@ script:
 before_deploy:
   # Setup variables
   - export TRAVIS_TAG=v${TRAVIS_BUILD_NUMBER}-${TRAVIS_OS_NAME}
-  - export EXE_NAME="lecar-web"
+  - export EXE_NAME=${PROJECT_NAME}
   - export ZIP_NAME=${PROJECT_NAME}-${TRAVIS_TAG}.zip
   # Set up git user name and tag this commit
   - git config --local user.name "Paul Reesman"
