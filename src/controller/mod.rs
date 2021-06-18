@@ -1,8 +1,10 @@
-use crate::cache::{Cache, CacheItem, LFUCacheItem, LRUCacheItem, ICache, IPolicy, ICacheItemWrapper, Policy};
 use self::constants::{DISCOUNT_RATE, LEARNING_RATE};
 use rand::random;
 use std::collections::{HashMap, BinaryHeap};
 use std::f64::consts::E;
+use std::cmp::Ordering;
+use crate::cache::{Cache, CacheItem, Caching};
+use std::hash::Hash;
 
 mod constants;
 
@@ -11,44 +13,66 @@ mod constants;
 /// Uses a learner to determine which policy cache to utilize
 /// TODO: Allow custom policy injection
 /// TODO: Allow deserialization for weights probability
-#[derive(Debug)]
-pub struct Controller {
-    cache: Cache<HashMap<usize, CacheItem>>,
-    lfu: Cache<BinaryHeap<LFUCacheItem>>,
-    lru: Cache<BinaryHeap<LRUCacheItem>>,
-    lfu_prob: f64
+pub struct Controller<'a, T: Copy + Eq + Hash> {
+    cache: Cache<HashMap<T, Box<dyn CacheItem<T>>>>,
+    policies: HashMap<&'a str,  &'a Cache<BinaryHeap<Box<dyn CacheItem<T>>>>>,
+    policy_compares: HashMap<&'a str, fn((T, &dyn CacheItem<T>), (T, &dyn CacheItem<T>)) -> Ordering>,
+    probabilities: HashMap<&'a str, f64>
 }
 
-impl Controller {
+impl<'a, T: Copy + Eq + Hash> Controller<'a, T> {
     /// Instantiates new new Controller given the cache sizes for each cache
-    pub fn new(cache_size: usize, lfu_cache_size: usize, lru_cache_size: usize) -> Self {
+    pub fn new(cache_size: usize, policies: Vec<(&'a str, usize, fn((T, &dyn CacheItem<T>), (T, &dyn CacheItem<T>)) -> Ordering)>) -> Self {
+        let mut policies_map = HashMap::with_capacity(policies.len());
+        let mut policy_compare_map = HashMap::with_capacity(policies.len());
+        let mut probabilities_map = HashMap::with_capacity(policies.len());
+        let probability = 1.0 / policies.len() as f64;
+        policies.iter().for_each(|(name, size, compare_function)| {
+            policies_map.insert(*name, &Cache::new(*size));
+            policy_compare_map.insert(*name, *compare_function);
+            probabilities_map.insert(*name, probability);
+        });
+
         Self {
             cache: Cache::new(cache_size),
-            lfu: Cache::new(lfu_cache_size),
-            lru: Cache::new(lru_cache_size),
-            lfu_prob: 0.5
+            policies: policies_map,
+            policy_compares: policy_compare_map,
+            probabilities: probabilities_map
         }
     }
 
-    fn get_policy(&self) -> Policy {
-        if random::<f64>() <= self.lfu_prob {
-            Policy::LFU
-        } else {
-            Policy::LRU
+    fn get_policy(&self) -> &str {
+        let random_prob = random::<f64>();
+        let mut cumulative_prob = 0.0;
+        let mut last_policy = "";
+
+        for (name, probability) in self.probabilities {
+            cumulative_prob += probability;
+            last_policy = name;
+
+            if random_prob <= cumulative_prob {
+                return name;
+            }
         }
+
+        last_policy
     }
 
-    fn update_weights(&mut self, time_duration: f64, miss_from: Policy) {
+    fn update_weights(&mut self, time_duration: f64, miss_from: &str) {
         let reward = DISCOUNT_RATE.powf(time_duration);
-        let mut new_lfu_prob = self.lfu_prob;
-        let mut new_lru_prob = 1.0 - self.lfu_prob;
 
-        match miss_from {
-            Policy::LFU => new_lru_prob = new_lru_prob * E.powf(LEARNING_RATE * reward),
-            Policy::LRU => new_lfu_prob = new_lfu_prob * E.powf(LEARNING_RATE * reward)
-        };
+        if let Some(mut miss_probability) = self.probabilities.get_mut(miss_from) {
+            *miss_probability *= E.powf(-(LEARNING_RATE * reward));
+        }
 
-        self.lfu_prob = new_lfu_prob / (new_lfu_prob + new_lru_prob);
+        let mut probability_sum = 0.0;
+        self.probabilities.iter().for_each(|(&_name, probability)| {
+            probability_sum += probability;
+        });
+
+        self.probabilities.iter_mut().for_each(|(&_name, mut probability)| {
+            *probability = probability / probability_sum;
+        });
     }
 
     /// Retrieves an item from the cache
@@ -60,28 +84,25 @@ impl Controller {
     /// Policy cache ejects an item depending on its policy if it is full in O(1) time
     /// Returns the found item or None
     pub fn get(&mut self, key: usize) -> Option<Vec<u8>> {
-        match self.cache.get(key) {
-            // HIT
-            Some(item) => Some(item.value().clone()),
-            // MISS
-            None => {
-                match self.find_key_in_policy_caches(key) {
-                    Some((ejected_item, time_duration, old_policy)) => {
-                        self.update_weights(time_duration, old_policy);
-                        let value_to_return = ejected_item.value().clone();
-                        let policy = self.get_policy();
-                        let maybe_cache_item = self.cache.insert_with_policy(ejected_item, policy);
+        // HIT
+        if let Some(item) = self.cache.get(key) {
+            Some(item.value().clone())
+        // MISS - Check Policy Caches
+        } else if let Some((ejected_item, time_duration, old_policy)) = self.find_key_in_policy_caches(key) {
+            self.update_weights(time_duration, old_policy);
+            let value_to_return = ejected_item.value().clone();
+            let policy = self.get_policy();
+            let maybe_cache_item = self.cache.insert_with_policy(ejected_item, self.policy_compares.get(&policy).unwrap());
 
-                        self.insert_into_policy_cache(
-                            maybe_cache_item,
-                            policy
-                        );
+            self.insert_into_policy_cache(
+                maybe_cache_item,
+                policy
+            );
 
-                        Some(value_to_return)
-                    },
-                    None => None
-                }
-            }
+            Some(value_to_return)
+        // MISS
+        } else {
+            None
         }
     }
 
@@ -92,62 +113,62 @@ impl Controller {
     /// If it does, it then updates the value
     /// Otherwise it inserts the item and ejects another item via a given policy from the learner
     /// It then inserts that ejected item into a policy cache which will eject an item if full
-    pub fn insert(&mut self, key: usize, value: Vec<u8>) {
+    pub fn insert(&mut self, key: T, value: Vec<u8>) {
         // Ejected cache item from either the LFU or the LRU, if it exists in either
-        match self.find_key_in_policy_caches(key) {
+        if let Some((mut ejected_item, time_duration, old_policy)) = self.find_key_in_policy_caches(key) {
             // If cache item existed in policy caches
             // Update it
             // Insert into main cache given the new policy
-            Some((mut ejected_item, time_duration, old_policy)) => {
-                ejected_item.update(value);
+            ejected_item.update(value);
 
-                self.update_weights(time_duration, old_policy);
-                let policy = self.get_policy();
+            self.update_weights(time_duration, old_policy);
+            let policy = self.get_policy();
 
-                let maybe_cache_item = self.cache.insert_with_policy(ejected_item, policy);
+            let maybe_cache_item = self.cache.insert_item_maybe_eject_with_policy(ejected_item, self.policy_compares.get(policy).unwrap());
 
-                self.insert_into_policy_cache(
-                    maybe_cache_item,
-                    policy
-                )
-            },
+            self.insert_into_policy_cache(
+                maybe_cache_item,
+                policy
+            )
+        } else {
             // Cache item was not found in the policy caches
             // Add it to cache
-            None => {
-                let policy = self.get_policy();
-                let maybe_cache_item = self.cache.insert_with_policy(CacheItem::new(key, value), policy);
+            let policy = self.get_policy();
+            let maybe_cache_item = self.cache.insert_item_maybe_eject_with_policy(CacheItem::new(key, value), self.policy_compares.get(policy).unwrap());
 
-                self.insert_into_policy_cache(
-                    maybe_cache_item,
-                    policy
-                )
-            }
+            self.insert_into_policy_cache(
+                maybe_cache_item,
+                policy
+            )
         }
     }
 
     /// Given a cache item and a policy, insert into the given policy cache
-    fn insert_into_policy_cache(&mut self, maybe_cache_item: Option<CacheItem>, policy: Policy) {
+    fn insert_into_policy_cache(&mut self, maybe_cache_item: Option<Box<dyn CacheItem<T>>>, policy: &str) {
         if let Some(cache_item) = maybe_cache_item {
-            match policy {
-                Policy::LFU => self.lfu.insert(LFUCacheItem::new(cache_item)),
-                Policy::LRU => self.lru.insert(LRUCacheItem::new(cache_item))
-            }
+            let test: &mut &Cache<_> = self.policies.get_mut(&policy).unwrap();
         }
     }
 
-    /// Given a key, find an item in a policy cache if it exists on one
-    fn find_key_in_policy_caches(&mut self, key: usize) -> Option<(CacheItem, f64, Policy)> {
-        self.lfu
-            .maybe_eject_key(key)
-            .and_then(|cache_item| Some(cache_item.into_inner()))
-            .or_else(|| self.lru
-                .maybe_eject_key(key)
-                .and_then(|cache_item| Some(cache_item.into_inner()))
-            )
+    /// Given a key, find an item in a policy cache if it exists in one
+    fn find_key_in_policy_caches(&mut self, key: usize) -> Option<(Box<dyn CacheItem<T>>, f64, &str)> {
+        for (&policy_name, mut policy) in &self.policies {
+            if let Some(cache_item) = policy.maybe_eject_key(key) {
+                return Some(cache_item.into_inner());
+            }
+        }
+
+        None
     }
 
     /// Returns a tuple of the current sizes of each cache
-    pub fn len(&self) -> (usize, usize, usize) {
-        (self.cache.len(), self.lfu.len(), self.lru.len())
+    pub fn len(&self) -> Vec<(&'a str, usize)> {
+        let mut size_vec = Vec::with_capacity(self.policies.len() + 1);
+        size_vec.push(("self", self.cache.len()));
+        self.policies.iter().for_each(|(&name, &cache)| {
+            size_vec.push((name, cache.len()));
+        });
+
+        size_vec
     }
 }
