@@ -4,8 +4,60 @@ use rand::random;
 use std::collections::BinaryHeap;
 use indexmap::IndexMap;
 use std::f64::consts::E;
+use std::io::Write;
+use std::fs::OpenOptions;
 
 mod constants;
+
+#[derive(Debug, Default)]
+pub struct Counter {
+    // Cache 
+    pub num_queries: u64,
+    pub hits: u64,
+    pub misses: u64,
+
+    // Size
+    pub raw_messsages_size: u64,
+    pub compressed_size: u64,
+
+    // Time
+    pub compression_time: u64,
+    pub decompression_time: u64,
+}
+
+impl std::fmt::Display for Counter {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{},{},{},{},{},{},{}\n", self.num_queries, self.hits, self.misses, 
+            self.raw_messsages_size, self.compressed_size, self.compression_time, self.decompression_time)
+    }
+}
+
+impl Counter {
+    pub fn try_write_to_file(&mut self) {
+        if self.num_queries != 1000 { return; }
+
+        let output_str = format!("{}", self);
+        let mut f = OpenOptions::new()
+            .append(true)
+            .create(true) // Optionally create the file if it doesn't already exist
+            .open("counter_logs.txt")
+            .expect("Unable to create file");
+
+        f.write_all(output_str.as_bytes()).expect("Unable to write data");
+        
+        self.reset();
+    }
+
+    pub fn reset(&mut self) {
+        self.num_queries = 0;
+        self.hits = 0;
+        self.misses = 0;
+        self.raw_messsages_size = 0;
+        self.compressed_size = 0;
+        self.compression_time = 0;
+        self.decompression_time = 0;
+    }
+}
 
 /// Controlling struct for the cache
 /// Keeps a main cache and several (2+) policy caches
@@ -17,7 +69,8 @@ pub struct Controller {
     cache: Cache<IndexMap<String, CacheItem>>,
     lfu: Cache<BinaryHeap<LFUCacheItem>>,
     lru: Cache<BinaryHeap<LRUCacheItem>>,
-    lfu_prob: f64
+    lfu_prob: f64,
+    pub counter: Counter
 }
 
 impl Controller {
@@ -27,7 +80,8 @@ impl Controller {
             cache: Cache::new(cache_size),
             lfu: Cache::new(lfu_cache_size),
             lru: Cache::new(lru_cache_size),
-            lfu_prob: 0.5
+            lfu_prob: 0.5,
+            counter: Default::default()
         }
     }
 
