@@ -1,7 +1,8 @@
 use crate::cache::{Cache, CacheItem, LFUCacheItem, LRUCacheItem, ICache, IPolicy, ICacheItemWrapper, Policy};
 use self::constants::{DISCOUNT_RATE, LEARNING_RATE};
 use rand::random;
-use std::collections::{HashMap, BinaryHeap};
+use std::collections::BinaryHeap;
+use indexmap::IndexMap;
 use std::f64::consts::E;
 
 mod constants;
@@ -13,7 +14,7 @@ mod constants;
 /// TODO: Allow deserialization for weights probability
 #[derive(Debug)]
 pub struct Controller {
-    cache: Cache<HashMap<usize, CacheItem>>,
+    cache: Cache<IndexMap<usize, CacheItem>>,
     lfu: Cache<BinaryHeap<LFUCacheItem>>,
     lru: Cache<BinaryHeap<LRUCacheItem>>,
     lfu_prob: f64
@@ -83,6 +84,15 @@ impl Controller {
                 }
             }
         }
+    }
+
+    pub fn get_index(&self, index: usize) -> Option<&CacheItem> {
+        self.cache.get_index(index)
+    }
+
+    /// Retrieves the index of an item from the cache
+    pub fn get_index_of(&self, key: usize) -> Option<usize> {
+        self.cache.get_index_of(key)
     }
 
     /// Inserts an item into the cache

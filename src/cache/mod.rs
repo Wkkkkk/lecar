@@ -1,4 +1,5 @@
-use std::collections::{BinaryHeap, HashMap};
+use std::collections::BinaryHeap;
+use indexmap::IndexMap;
 
 mod cache_item;
 mod enums;
@@ -60,12 +61,12 @@ impl<I: ICacheItemWrapper> ICache for Cache<BinaryHeap<I>> {
     }
 }
 
-/// Implementation of ICache for a HashMap cache
-impl ICache for Cache<HashMap<usize, CacheItem>> {
+/// Implementation of ICache for a IndexMap cache
+impl ICache for Cache<IndexMap<usize, CacheItem>> {
     fn new(capacity: usize) -> Self {
         Self {
             capacity,
-            cache: HashMap::with_capacity(capacity)
+            cache: IndexMap::with_capacity(capacity)
         }
     }
 
@@ -79,13 +80,26 @@ impl ICache for Cache<HashMap<usize, CacheItem>> {
 }
 
 /// Implementation of a key / value cache with a max capacity
-impl Cache<HashMap<usize, CacheItem>> {
+impl Cache<IndexMap<usize, CacheItem>> {
     /// Retrieves a cached item and updates it before returning it
     pub fn get(&mut self, key: usize) -> Option<&CacheItem> {
         self.cache.get_mut(&key).and_then(|ci| {
             ci.touch();
             Some(&*ci)
         })
+    }
+
+    pub fn get_index_of(&self, key: usize) -> Option<usize> {
+        self.cache.get_index_of(&key)
+    }
+
+    pub fn get_index(&self, index: usize) -> Option<&CacheItem> {
+        match self.cache.get_index(index) {
+            Some((_key, item)) => {
+                Some(item)
+            }
+            None => None
+        }
     }
 
     /// Inserts an item to the cache
