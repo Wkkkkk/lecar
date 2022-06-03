@@ -91,8 +91,8 @@ impl Controller {
     }
 
     /// Retrieves the index of an item from the cache
-    pub fn get_index_of(&self, key: String) -> Option<usize> {
-        self.cache.get_index_of(&key)
+    pub fn get_index_of(&self, key: &str) -> Option<usize> {
+        self.cache.get_index_of(key)
     }
 
     /// Inserts an item into the cache
