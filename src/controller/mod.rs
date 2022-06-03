@@ -14,7 +14,7 @@ mod constants;
 /// TODO: Allow deserialization for weights probability
 #[derive(Debug)]
 pub struct Controller {
-    cache: Cache<IndexMap<usize, CacheItem>>,
+    cache: Cache<IndexMap<String, CacheItem>>,
     lfu: Cache<BinaryHeap<LFUCacheItem>>,
     lru: Cache<BinaryHeap<LRUCacheItem>>,
     lfu_prob: f64
@@ -60,16 +60,16 @@ impl Controller {
     /// If an item is ejected from the main cache, it then inserts it into a policy cache
     /// Policy cache ejects an item depending on its policy if it is full in O(1) time
     /// Returns the found item or None
-    pub fn get(&mut self, key: usize) -> Option<Vec<u8>> {
+    pub fn get(&mut self, key: &str) -> Option<String> {
         match self.cache.get(key) {
             // HIT
-            Some(item) => Some(item.value().clone()),
+            Some(item) => Some(item.value().to_string()),
             // MISS
             None => {
                 match self.find_key_in_policy_caches(key) {
                     Some((ejected_item, time_duration, old_policy)) => {
                         self.update_weights(time_duration, old_policy);
-                        let value_to_return = ejected_item.value().clone();
+                        let value_to_return = ejected_item.value().to_string();
                         let policy = self.get_policy();
                         let maybe_cache_item = self.cache.insert_with_policy(ejected_item, policy);
 
@@ -91,8 +91,8 @@ impl Controller {
     }
 
     /// Retrieves the index of an item from the cache
-    pub fn get_index_of(&self, key: usize) -> Option<usize> {
-        self.cache.get_index_of(key)
+    pub fn get_index_of(&self, key: String) -> Option<usize> {
+        self.cache.get_index_of(&key)
     }
 
     /// Inserts an item into the cache
@@ -102,7 +102,7 @@ impl Controller {
     /// If it does, it then updates the value
     /// Otherwise it inserts the item and ejects another item via a given policy from the learner
     /// It then inserts that ejected item into a policy cache which will eject an item if full
-    pub fn insert(&mut self, key: usize, value: Vec<u8>) {
+    pub fn insert(&mut self, key: &str, value: String) {
         // Ejected cache item from either the LFU or the LRU, if it exists in either
         match self.find_key_in_policy_caches(key) {
             // If cache item existed in policy caches
@@ -125,7 +125,7 @@ impl Controller {
             // Add it to cache
             None => {
                 let policy = self.get_policy();
-                let maybe_cache_item = self.cache.insert_with_policy(CacheItem::new(key, value), policy);
+                let maybe_cache_item = self.cache.insert_with_policy(CacheItem::new(key.to_string(), value), policy);
 
                 self.insert_into_policy_cache(
                     maybe_cache_item,
@@ -146,7 +146,7 @@ impl Controller {
     }
 
     /// Given a key, find an item in a policy cache if it exists on one
-    fn find_key_in_policy_caches(&mut self, key: usize) -> Option<(CacheItem, f64, Policy)> {
+    fn find_key_in_policy_caches(&mut self, key: &str) -> Option<(CacheItem, f64, Policy)> {
         self.lfu
             .maybe_eject_key(key)
             .and_then(|cache_item| Some(cache_item.into_inner()))
@@ -159,5 +159,9 @@ impl Controller {
     /// Returns a tuple of the current sizes of each cache
     pub fn len(&self) -> (usize, usize, usize) {
         (self.cache.len(), self.lfu.len(), self.lru.len())
+    }
+
+    pub fn full(&self) -> bool {
+        self.cache.len() == self.cache.capacity
     }
 }

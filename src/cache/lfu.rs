@@ -37,7 +37,7 @@ impl PartialOrd for LFUCacheItem {
 
 /// Implements ICacheItemWrapper for LFU use
 impl ICacheItemWrapper for LFUCacheItem {
-    fn get_inner_key(&self) -> usize {
+    fn get_inner_key(&self) -> &str {
         self.0.key()
     }
 

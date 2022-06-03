@@ -28,15 +28,15 @@ fn test_controller() {
 
     for _ in 0..rng.gen_range(1_000, 2_000) {
         let key = rng.gen_range(0, 300);
+        let key = key.to_string();
 
         match AccessMethod::from_bool(rng.gen_bool(0.10)) {
             AccessMethod::READ => {
-                cache_controller.get(key);
+                cache_controller.get(&key);
             },
             AccessMethod::WRITE => {
-                let mut data = [0u8; 1_000];
-                rng.fill_bytes(&mut data);
-                cache_controller.insert(key, data.to_vec());
+                let data = "abcdefg";
+                cache_controller.insert(&key, data.to_string());
             }
         }
     }

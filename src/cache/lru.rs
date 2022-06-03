@@ -37,7 +37,7 @@ impl PartialOrd for LRUCacheItem {
 
 /// Implements ICacheItemWrapper for LRU use
 impl ICacheItemWrapper for LRUCacheItem {
-    fn get_inner_key(&self) -> usize {
+    fn get_inner_key(&self) -> &str {
         self.0.key()
     }
 

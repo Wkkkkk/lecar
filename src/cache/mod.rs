@@ -16,7 +16,7 @@ pub use self::{
 /// Trait which gives an interface for retrieving the wrapped item's key
 /// Or converting the item into the wrapped item
 pub trait ICacheItemWrapper: Clone + Eq + PartialEq + Ord + PartialOrd {
-    fn get_inner_key(&self) -> usize;
+    fn get_inner_key(&self) -> &str;
     fn get_duration(&self) -> f64;
     fn into_inner(self) -> (CacheItem, f64, Policy);
 }
@@ -24,22 +24,23 @@ pub trait ICacheItemWrapper: Clone + Eq + PartialEq + Ord + PartialOrd {
 /// Trait to enforce interface for caches
 pub trait ICache {
     fn new(capacity: usize) -> Self;
-    fn contains(&self, key: usize) -> bool;
+    fn contains(&self, key: &str) -> bool;
     fn len(&self) -> usize;
+    fn full(&self) -> bool;
 }
 
 /// Trait to give a policy to a cache
 /// Tells the cache HOW to to evict and insert items
 pub trait IPolicy<I: ICacheItemWrapper> {
     fn eject(&mut self);
-    fn maybe_eject_key(&mut self, key: usize) -> Option<I>;
+    fn maybe_eject_key(&mut self, key: &str) -> Option<I>;
     fn insert(&mut self, cache_item: I);
 }
 
 /// Basic struct for caches
 #[derive(Debug)]
 pub struct Cache<C> {
-    capacity: usize,
+    pub capacity: usize,
     cache: C
 }
 
@@ -52,17 +53,21 @@ impl<I: ICacheItemWrapper> ICache for Cache<BinaryHeap<I>> {
         }
     }
 
-    fn contains(&self, key: usize) -> bool {
+    fn contains(&self, key: &str) -> bool {
         self.cache.iter().any(|i| i.get_inner_key() == key)
     }
 
     fn len(&self) -> usize {
         self.cache.len()
     }
+
+    fn full(&self) -> bool {
+        self.capacity == self.cache.len()
+    }
 }
 
 /// Implementation of ICache for a IndexMap cache
-impl ICache for Cache<IndexMap<usize, CacheItem>> {
+impl ICache for Cache<IndexMap<String, CacheItem>> {
     fn new(capacity: usize) -> Self {
         Self {
             capacity,
@@ -70,27 +75,31 @@ impl ICache for Cache<IndexMap<usize, CacheItem>> {
         }
     }
 
-    fn contains(&self, key: usize) -> bool {
-        self.cache.contains_key(&key)
+    fn contains(&self, key: &str) -> bool {
+        self.cache.contains_key(key)
     }
 
     fn len(&self) -> usize {
         self.cache.len()
     }
+
+    fn full(&self) -> bool {
+        self.capacity == self.cache.len()
+    }
 }
 
 /// Implementation of a key / value cache with a max capacity
-impl Cache<IndexMap<usize, CacheItem>> {
+impl Cache<IndexMap<String, CacheItem>> {
     /// Retrieves a cached item and updates it before returning it
-    pub fn get(&mut self, key: usize) -> Option<&CacheItem> {
-        self.cache.get_mut(&key).and_then(|ci| {
+    pub fn get(&mut self, key: &str) -> Option<&CacheItem> {
+        self.cache.get_mut(key).and_then(|ci| {
             ci.touch();
             Some(&*ci)
         })
     }
 
-    pub fn get_index_of(&self, key: usize) -> Option<usize> {
-        self.cache.get_index_of(&key)
+    pub fn get_index_of(&self, key: &str) -> Option<usize> {
+        self.cache.get_index_of(key)
     }
 
     pub fn get_index(&self, index: usize) -> Option<&CacheItem> {
@@ -107,11 +116,11 @@ impl Cache<IndexMap<usize, CacheItem>> {
     /// Fails an returns item if the cache is full
     #[allow(dead_code)]
     pub fn insert(&mut self, new_item: CacheItem) -> Option<CacheItem> {
-        if self.cache.len() == self.capacity && !self.cache.contains_key(&new_item.key()) {
+        if self.full() && !self.cache.contains_key(new_item.key()) {
             return Some(new_item);
         }
 
-        self.cache.insert(new_item.key(), new_item);
+        self.cache.insert(new_item.key().to_string(), new_item);
         None
     }
 
@@ -119,17 +128,17 @@ impl Cache<IndexMap<usize, CacheItem>> {
     /// Updates an already existing item
     /// If the cache is full, given a policy, ejects an item that matches the policy
     pub fn insert_with_policy(&mut self, new_item: CacheItem, policy: Policy) -> Option<CacheItem> {
-        match self.cache.get_mut(&new_item.key()) {
+        match self.cache.get_mut(new_item.key()) {
             Some(item) => {
                 item.update(new_item.value_owned());
                 None
             },
             None => {
                 if self.capacity > self.cache.len() {
-                    self.cache.insert(new_item.key(), new_item);
+                    self.cache.insert(new_item.key().to_string(), new_item);
                     None
                 } else {
-                    let item_to_remove = *self.cache
+                    let item_to_remove = self.cache
                         .iter()
                         .min_by(|(_lk, li), (_rk, ri)| {
                             match policy {
@@ -138,10 +147,11 @@ impl Cache<IndexMap<usize, CacheItem>> {
                             }
                         })
                         .unwrap()
-                        .0;
+                        .0
+                        .to_string();
 
                     let lfu_item = Some(self.cache.remove(&item_to_remove).unwrap());
-                    self.cache.insert(new_item.key(), new_item);
+                    self.cache.insert(new_item.key().to_string(), new_item);
 
                     lfu_item
                 }
@@ -160,7 +170,7 @@ impl<I: ICacheItemWrapper> IPolicy<I> for Cache<BinaryHeap<I>> {
 
     /// Iterates over the BinaryHeap to find an item given a key
     /// If found, ejects, reorders BinaryHeap, and returns the item
-    fn maybe_eject_key(&mut self, key: usize) -> Option<I> {
+    fn maybe_eject_key(&mut self, key: &str) -> Option<I> {
         match self.cache.iter().filter(|item| item.get_inner_key() == key).next() {
             Some(t) => {
                 let cloned_item = t.clone();
@@ -174,7 +184,7 @@ impl<I: ICacheItemWrapper> IPolicy<I> for Cache<BinaryHeap<I>> {
     /// If the cache is full, eject an item from the cache
     /// Then insert the given item into the cache
     fn insert(&mut self, cache_item: I) {
-        if self.capacity == self.cache.len() {
+        if self.full() {
             self.eject();
         }
 
