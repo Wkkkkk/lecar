@@ -1,5 +1,6 @@
 use std::collections::BinaryHeap;
 use indexmap::IndexMap;
+use serde::{Deserialize, Serialize};
 
 mod cache_item;
 mod enums;
@@ -38,7 +39,7 @@ pub trait IPolicy<I: ICacheItemWrapper> {
 }
 
 /// Basic struct for caches
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Cache<C> {
     pub capacity: usize,
     cache: C

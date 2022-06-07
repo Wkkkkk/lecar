@@ -1,9 +1,11 @@
 use std::time::Instant;
+use serde::{Deserialize, Serialize};
 
 /// Definition of a cache item
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(Serialize, Deserialize, Eq, PartialEq, Clone, Debug)]
 pub struct CacheItem {
     frequency: usize,
+    #[serde(with = "serde_millis")]
     last_used: Instant,
     key: String,
     value: String

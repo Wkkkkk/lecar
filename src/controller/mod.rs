@@ -1,6 +1,10 @@
 use crate::cache::{Cache, CacheItem, LFUCacheItem, LRUCacheItem, ICache, IPolicy, ICacheItemWrapper, Policy};
 use self::constants::{DISCOUNT_RATE, LEARNING_RATE};
 use rand::random;
+use rand::SeedableRng;
+use rand::rngs::StdRng;
+use rand::Rng;
+use std::default::Default;
 use std::collections::BinaryHeap;
 use indexmap::IndexMap;
 use std::f64::consts::E;
@@ -9,7 +13,9 @@ use std::fs::OpenOptions;
 
 mod constants;
 
-#[derive(Debug, Default)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize, Debug, Default)]
 pub struct Counter {
     // Cache 
     pub num_queries: u64,
@@ -64,12 +70,13 @@ impl Counter {
 /// Uses a learner to determine which policy cache to utilize
 /// TODO: Allow custom policy injection
 /// TODO: Allow deserialization for weights probability
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Controller {
     cache: Cache<IndexMap<String, CacheItem>>,
     lfu: Cache<BinaryHeap<LFUCacheItem>>,
     lru: Cache<BinaryHeap<LRUCacheItem>>,
     lfu_prob: f64,
+    // rng: StdRng,
     pub counter: Counter
 }
 
@@ -81,11 +88,13 @@ impl Controller {
             lfu: Cache::new(lfu_cache_size),
             lru: Cache::new(lru_cache_size),
             lfu_prob: 0.5,
+            // rng: StdRng::Default::default(),
             counter: Default::default()
         }
     }
 
     fn get_policy(&self) -> Policy {
+        // let r = self.rng.gen::<f64>();
         if random::<f64>() <= self.lfu_prob {
             Policy::LFU
         } else {

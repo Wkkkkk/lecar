@@ -1,10 +1,13 @@
 use std::cmp::Ordering;
 use crate::cache::{ICacheItemWrapper, CacheItem, Policy};
 use std::time::Instant;
+use serde::{Deserialize, Serialize};
 
 /// Wrapper struct for CacheItem to implement different PartialEq, PartialOrd, and Ord
-#[derive(Eq, Clone, Debug)]
-pub struct LFUCacheItem(CacheItem, Instant);
+#[derive(Serialize, Deserialize, Eq, Clone, Debug)]
+pub struct LFUCacheItem(CacheItem, 
+    #[serde(with = "serde_millis")]
+    Instant);
 
 /// Implementation of the LFUCacheItem
 impl LFUCacheItem {
