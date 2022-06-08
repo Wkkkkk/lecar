@@ -18,6 +18,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct Counter {
     // Cache 
+    pub size: u64,
     pub num_queries: u64,
     pub hits: u64,
     pub misses: u64,
@@ -29,12 +30,13 @@ pub struct Counter {
     // Time
     pub compression_time: u64,
     pub decompression_time: u64,
+    pub updating_time: u64,
 }
 
 impl std::fmt::Display for Counter {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{},{},{},{},{},{},{}\n", self.num_queries, self.hits, self.misses, 
-            self.raw_messsages_size, self.compressed_size, self.compression_time, self.decompression_time)
+        write!(f, "{},{},{},{},{},{},{},{},{}\n", self.size, self.num_queries, self.hits, self.misses, 
+            self.raw_messsages_size, self.compressed_size, self.compression_time, self.decompression_time, self.updating_time)
     }
 }
 
@@ -62,6 +64,7 @@ impl Counter {
         self.compressed_size = 0;
         self.compression_time = 0;
         self.decompression_time = 0;
+        self.updating_time = 0;
     }
 }
 

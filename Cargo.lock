@@ -15,6 +15,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
+name = "get-size"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ffff7b577402f46b6e0069ae9c31a7859ab3f2abe7ff0fb614fe6441a1d6c306"
+dependencies = [
+ "get-size-derive",
+]
+
+[[package]]
+name = "get-size-derive"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "316da74ccd236d0915a5793f3cb37b1154cc41857373d9a7334053294c933f70"
+dependencies = [
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "getrandom"
 version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -52,6 +71,7 @@ checksum = "dc6f3ad7b9d11a0c00842ff8de1b60ee58661048eb8049ed33c73594f359d7e6"
 name = "lecar"
 version = "0.1.0"
 dependencies = [
+ "get-size",
  "indexmap",
  "rand",
  "serde",
