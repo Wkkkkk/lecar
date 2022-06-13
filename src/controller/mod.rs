@@ -1,9 +1,9 @@
 use crate::cache::{Cache, CacheItem, LFUCacheItem, LRUCacheItem, ICache, IPolicy, ICacheItemWrapper, Policy};
 use self::constants::{DISCOUNT_RATE, LEARNING_RATE};
 use rand::random;
-use rand::SeedableRng;
-use rand::rngs::StdRng;
-use rand::Rng;
+use rand::RngCore;
+use rand_chacha::rand_core::SeedableRng;
+use rand_chacha::ChaCha8Rng;
 use std::default::Default;
 use std::collections::BinaryHeap;
 use indexmap::IndexMap;
@@ -79,7 +79,7 @@ pub struct Controller {
     lfu: Cache<BinaryHeap<LFUCacheItem>>,
     lru: Cache<BinaryHeap<LRUCacheItem>>,
     lfu_prob: f64,
-    // rng: StdRng,
+    rng: ChaCha8Rng,
     pub counter: Counter
 }
 
@@ -91,18 +91,21 @@ impl Controller {
             lfu: Cache::new(lfu_cache_size),
             lru: Cache::new(lru_cache_size),
             lfu_prob: 0.5,
-            // rng: StdRng::Default::default(),
+            rng: rand_chacha::ChaCha8Rng::seed_from_u64(10),
             counter: Default::default()
         }
     }
 
-    fn get_policy(&self) -> Policy {
-        // let r = self.rng.gen::<f64>();
-        if random::<f64>() <= self.lfu_prob {
+    fn get_policy(&mut self) -> Policy {
+        let r = self.rng.next_u32();
+        let p = r as f64 / u32::MAX as f64;
+        // if random::<f64>() <= self.lfu_prob {
+        if p <= self.lfu_prob {
             Policy::LFU
         } else {
             Policy::LRU
         }
+        // Policy::LFU
     }
 
     fn update_weights(&mut self, time_duration: f64, miss_from: Policy) {
