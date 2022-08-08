@@ -44,7 +44,7 @@ impl std::fmt::Display for Counter {
 
 impl Counter {
     pub fn try_write_to_file(&mut self, path: &str) {
-        if self.num_queries != 1000 { return; }
+        if self.num_queries < 1000 { return; }
 
         let output_str = format!("{}", self);
         let mut f = OpenOptions::new()
