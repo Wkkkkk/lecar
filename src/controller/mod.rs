@@ -33,12 +33,15 @@ pub struct Counter {
     pub compression_time: u64,
     pub decompression_time: u64,
     pub updating_time: u64,
+
+    // Memory
+    pub memory_size: u64,
 }
 
 impl std::fmt::Display for Counter {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{},{},{},{},{},{},{},{},{},{},{}\n", self.size, self.num_queries, self.hits, self.misses, 
-            self.raw_messsages_size, self.compressed_size, self.raw_len, self.encoded_len, self.compression_time, self.decompression_time, self.updating_time)
+        write!(f, "{},{},{},{},{},{},{},{},{},{},{}, {}\n", self.size, self.num_queries, self.hits, self.misses, 
+            self.raw_messsages_size, self.compressed_size, self.raw_len, self.encoded_len, self.compression_time, self.decompression_time, self.updating_time, self.memory_size)
     }
 }
 
@@ -69,6 +72,7 @@ impl Counter {
         self.compression_time = 0;
         self.decompression_time = 0;
         self.updating_time = 0;
+        self.memory_size = 0;
     }
 }
 
