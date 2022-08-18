@@ -237,4 +237,10 @@ impl Controller {
     pub fn full(&self) -> bool {
         self.cache.len() == self.cache.capacity
     }
+
+    pub fn print_size(&self) -> usize {
+        let serialized = serde_json::to_string(&self).unwrap();
+
+        serialized.len()
+    }
 }
