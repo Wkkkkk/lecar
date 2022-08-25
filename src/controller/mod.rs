@@ -137,16 +137,16 @@ impl Controller {
     /// If an item is ejected from the main cache, it then inserts it into a policy cache
     /// Policy cache ejects an item depending on its policy if it is full in O(1) time
     /// Returns the found item or None
-    pub fn get(&mut self, key: &str) -> Option<String> {
+    pub fn get(&mut self, key: &str) -> Option<u32> {
         match self.cache.get(key) {
             // HIT
-            Some(item) => Some(item.value().to_string()),
+            Some(item) => Some(item.value()),
             // MISS
             None => {
                 match self.find_key_in_policy_caches(key) {
                     Some((ejected_item, time_duration, old_policy)) => {
                         self.update_weights(time_duration, old_policy);
-                        let value_to_return = ejected_item.value().to_string();
+                        let value_to_return = ejected_item.value();
                         let policy = self.get_policy();
                         let maybe_cache_item = self.cache.insert_with_policy(ejected_item, policy);
 
@@ -163,7 +163,7 @@ impl Controller {
         }
     }
 
-    pub fn get_index(&self, index: usize) -> Option<&CacheItem> {
+    pub fn get_index(&self, index: usize) -> Option<&str> {
         self.cache.get_index(index)
     }
 
@@ -179,7 +179,7 @@ impl Controller {
     /// If it does, it then updates the value
     /// Otherwise it inserts the item and ejects another item via a given policy from the learner
     /// It then inserts that ejected item into a policy cache which will eject an item if full
-    pub fn insert(&mut self, key: &str, value: String) {
+    pub fn insert(&mut self, key: &str, value: u32) {
         // Ejected cache item from either the LFU or the LRU, if it exists in either
         match self.find_key_in_policy_caches(key) {
             // If cache item existed in policy caches

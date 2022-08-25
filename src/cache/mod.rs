@@ -103,10 +103,10 @@ impl Cache<IndexMap<String, CacheItem>> {
         self.cache.get_index_of(key)
     }
 
-    pub fn get_index(&self, index: usize) -> Option<&CacheItem> {
+    pub fn get_index(&self, index: usize) -> Option<&str> {
         match self.cache.get_index(index) {
-            Some((_key, item)) => {
-                Some(item)
+            Some((key, _)) => {
+                Some(key)
             }
             None => None
         }

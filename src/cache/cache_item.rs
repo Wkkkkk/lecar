@@ -8,13 +8,13 @@ pub struct CacheItem {
     #[serde(with = "serde_millis")]
     last_used: Instant,
     key: String,
-    value: String
+    value: u32,
 }
 
 /// Implementation of a cache item
 impl CacheItem {
     /// Instantiates a new cache item given the key and value
-    pub fn new(key: String, value: String) -> Self {
+    pub fn new(key: String, value: u32) -> Self {
         Self {
             frequency: 0,
             last_used: Instant::now(),
@@ -32,7 +32,7 @@ impl CacheItem {
 
     /// Sets the cache item's value to the one given
     /// Calls the touch method
-    pub fn update(&mut self, value: String) {
+    pub fn update(&mut self, value: u32) {
         self.value = value;
         self.touch();
     }
@@ -53,13 +53,13 @@ impl CacheItem {
     }
 
     /// Getter for value
-    pub fn value(&self) -> &str {
-        &self.value
+    pub fn value(&self) -> u32 {
+        self.value
     }
 
     /// Getter for value
     /// Consumes self
-    pub fn value_owned(self) -> String {
+    pub fn value_owned(self) -> u32 {
         self.value
     }
 }
