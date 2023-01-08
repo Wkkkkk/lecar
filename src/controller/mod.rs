@@ -1,6 +1,5 @@
 use crate::cache::{Cache, CacheItem, LFUCacheItem, LRUCacheItem, ICache, IPolicy, ICacheItemWrapper, Policy};
 use self::constants::{DISCOUNT_RATE, LEARNING_RATE};
-use rand::random;
 use rand::RngCore;
 use rand_chacha::rand_core::SeedableRng;
 use rand_chacha::ChaCha8Rng;
@@ -126,7 +125,8 @@ impl Controller {
             Policy::LRU => new_lfu_prob = new_lfu_prob * E.powf(LEARNING_RATE * reward)
         };
 
-        self.lfu_prob = new_lfu_prob / (new_lfu_prob + new_lru_prob);
+        let lfu_prob = new_lfu_prob / (new_lfu_prob + new_lru_prob);
+        self.lfu_prob = (lfu_prob * 100.0).round() / 100.0;
     }
 
     /// Retrieves an item from the cache
